@@ -3,15 +3,15 @@ frontend:
   phases:
     preBuild:
       commands:
-        - cd citi-events
-        - npm install
+        - yarn install
+        - echo "REACT_APP_API_URL=https://b3vbuky775.execute-api.eu-north-1.amazonaws.com" >> .env
     build:
       commands:
-        - npm run build
+        - yarn build
   artifacts:
-    baseDirectory: citi-events/build
+    baseDirectory: build
     files:
       - '**/*'
   cache:
     paths:
-      - citi-events/node_modules/**/*
+      - node_modules/**/*
