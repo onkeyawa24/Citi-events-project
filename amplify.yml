@@ -4,7 +4,7 @@ frontend:
     preBuild:
       commands:
         - npm install
-        - echo "REACT_APP_API_URL=https://b3vbuky775.execute-api.eu-north-1.amazonaws.com" >> .env
+        - echo "REACT_APP_API_URL=https://b3vbuky775.execute-api.eu-north-1.amazonaws.com" > .env
     build:
       commands:
         - npm run build
