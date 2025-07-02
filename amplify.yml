@@ -3,11 +3,11 @@ frontend:
   phases:
     preBuild:
       commands:
-        - yarn install
+        - npm install
         - echo "REACT_APP_API_URL=https://b3vbuky775.execute-api.eu-north-1.amazonaws.com" >> .env
     build:
       commands:
-        - yarn build
+        - npm run build
   artifacts:
     baseDirectory: build
     files:
