@@ -8,7 +8,7 @@ import NavbarPage from './NavbarPage';
 function App() {
   return (
     <div style={{ padding: '80px', fontFamily: 'Arial, sans-serif' }}>
-      <NavbarPage />
+   
       <h1>📅 Citi-events</h1>
       <MotivationPage />
        <hr style={{ margin: '2rem 0' }} />
