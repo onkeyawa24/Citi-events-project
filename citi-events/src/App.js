@@ -4,7 +4,6 @@ import EventsPage from './EventsPage';
 import UploadForm from './UploadForm';
 import MotivationPage from './MotivationPage';
 import NavbarPage from './NavbarPage';
-import 'bootstrap/dist/css/bootstrap.min.css';
 
 function App() {
   return (
