@@ -1,26 +1,34 @@
+// src/App.js
 import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import Layout from './Layout';
 import WelcomeSection from './WelcomeSection';
-import EventsPage from './EventsPage';
+import Events from './Events';
 import UploadForm from './UploadForm';
 import MotivationPage from './MotivationPage';
-import NavbarPage from './NavbarPage';
-
+import Announcements from './Announcements';
+import Rsvp from './Rsvp';
+import AdminDashboard from './AdminDashboard';
 
 function App() {
   return (
-    <div style={{ padding: "80px", background: '#161f36', color: 'white', padding: '80px', fontFamily: 'Arial, sans-serif' }}>
-      <NavbarPage />
-     <WelcomeSection />
-      <hr style={{ margin: '2rem 0' }} />
-      <MotivationPage />
-       <hr style={{ margin: '2rem 0' }} />
-      
-      <EventsPage />
-       <hr style={{ margin: '2rem 0' }} />
-       
-      <UploadForm />
-      <hr style={{ margin: '2rem 0' }} />
-    </div>
+   
+      <Routes>
+        <Route path="/" element={<Layout />}>
+          {/* Default route */}
+          <Route index element={<WelcomeSection />} />
+
+          {/* Other pages */}
+          <Route path="events" element={<Events />} />
+          <Route path="Announcements" element={<Announcements />} />
+          <Route path="Rsvp" element={<Rsvp />} />
+          <Route path="AdminDashboard" element={<AdminDashboard />} />
+          <Route path="motivation" element={<MotivationPage />} />
+          
+          {/* Add more as needed */}
+        </Route>
+      </Routes>
+
   );
 }
 

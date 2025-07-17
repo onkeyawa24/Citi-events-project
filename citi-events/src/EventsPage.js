@@ -262,11 +262,6 @@ const EventsPageWithNavbar = () => {
 
   return (
     <div style={{ backgroundColor: colors.primaryBg, minHeight: '100vh' }}>
-      {/* Navbar (unchanged) */}
-      <Navbar fixed="top" expand="lg" bg="dark" variant="dark" className="shadow-sm py-2" style={{ backgroundColor: '#111827' }}>
-        {/* ... existing navbar code ... */}
-      </Navbar>
-
       {/* Main Content */}
       <div style={{ 
         padding: '80px 20px 20px', 
