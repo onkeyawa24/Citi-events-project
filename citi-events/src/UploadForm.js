@@ -57,8 +57,7 @@ export default function UploadForm({ onSuccess }) {
     setLoading(true);
 
     try {
-      const { tokens } = await fetchAuthSession();
-      const idToken = tokens.idToken.toString();
+     
 
       // Prepare payload
       const payload = {
@@ -82,7 +81,7 @@ export default function UploadForm({ onSuccess }) {
         {
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${idToken}`
+           
           }
         }
       );
