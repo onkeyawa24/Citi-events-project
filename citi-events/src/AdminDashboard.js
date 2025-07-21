@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Tabs, Tab, Container, Form, Button, Spinner, Alert, Dropdown } from 'react-bootstrap';
 import { FiMoreHorizontal, FiLogOut } from 'react-icons/fi';
-import { getCurrentUser, fetchAuthSession, signOut } from 'aws-amplify/auth';
 import axios from 'axios';
 import AdminAddMedia from './AdminAddMedia';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
@@ -24,36 +23,24 @@ const AdminDashboard = () => {
   const [mediaFiles, setMediaFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('events');
 
   useEffect(() => {
-    const verifyAdmin = async () => {
+    const fetchData = async () => {
       try {
         setIsLoading(true);
-        const { username, signInDetails } = await getCurrentUser();
-        const { tokens } = await fetchAuthSession();
-        
-        const groups = tokens?.accessToken?.payload['cognito:groups'] || [];
-        setIsAdmin(groups.includes('Admins'));
-
-        if (!groups.includes('Admins')) {
-          setError('You do not have admin privileges');
-        } else {
-          await fetchEvents();
-          await fetchAnnouncements();
-        }
+        await fetchEvents();
+        await fetchAnnouncements();
       } catch (err) {
-        setError('Authentication error. Please login again.');
+        setError('Failed to load data');
         console.error(err);
-        await handleSignOut();
       } finally {
         setIsLoading(false);
       }
     };
 
-    verifyAdmin();
+    fetchData();
   }, []);
 
   const fetchAnnouncements = async () => {
@@ -63,15 +50,6 @@ const AdminDashboard = () => {
     } catch (err) {
       setError('Failed to fetch announcements');
       console.error(err);
-    }
-  };
-
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      window.location.href = '/';
-    } catch (err) {
-      console.error('Error signing out:', err);
     }
   };
 
@@ -176,23 +154,7 @@ const AdminDashboard = () => {
         <Container style={{ maxWidth: '800px' }}>
           <Alert variant="danger">
             {error}
-            <div className="mt-3">
-              <Button variant="primary" onClick={handleSignOut}>
-                Return to Login
-              </Button>
-            </div>
           </Alert>
-        </Container>
-      </div>
-    );
-  }
-
-  if (!isAdmin) {
-    return (
-      <div style={{ backgroundColor: colors.background, minHeight: '100vh', padding: '80px 20px', color: colors.textPrimary }}>
-        <Container style={{ maxWidth: '800px' }}>
-          <Spinner animation="border" variant="light" />
-          <p className="mt-3">Verifying admin privileges...</p>
         </Container>
       </div>
     );
@@ -229,9 +191,6 @@ const AdminDashboard = () => {
       <Container style={{ maxWidth: '1000px' }}>
         <div className="d-flex justify-content-between align-items-center mb-4">
           <h2 style={{ color: colors.textPrimary }}>🛠️ Admin Dashboard</h2>
-          <Button variant="danger" onClick={handleSignOut}>
-            <FiLogOut className="me-1" /> Logout
-          </Button>
         </div>
 
         {error && <Alert variant="danger" className="mb-4">{error}</Alert>}

@@ -195,9 +195,7 @@ const NavbarPage = () => {
                 <Nav.Link as={NavLink} to="/adminDashboard" className="text-dark">
                   Admin
                 </Nav.Link>
-                <Button variant="danger" onClick={handleSignOut} className="w-100 mt-2">
-                  <FiLogOut className="me-2" /> Sign Out
-                </Button>
+          
               </div>
             )}
           </div>
