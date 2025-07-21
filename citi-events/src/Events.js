@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, Alert, Spinner } from 'react-bootstrap';
 import { FaCalendarAlt, FaThumbsUp } from 'react-icons/fa';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './navbarPage.css';
 
@@ -16,6 +17,7 @@ const colors = {
 };
 
 const Events = () => {
+  const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [rsvpCounts, setRsvpCounts] = useState({});
   const [loading, setLoading] = useState(true);
@@ -25,12 +27,8 @@ const Events = () => {
   const [rsvpEmail, setRsvpEmail] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [userReactions, setUserReactions] = useState({});
-
-  // Media modal preview state
   const [mediaModalUrl, setMediaModalUrl] = useState(null);
   const [mediaModalIsVideo, setMediaModalIsVideo] = useState(false);
-
-  // Scroll index per event id for thumbnails
   const [thumbnailScroll, setThumbnailScroll] = useState({});
 
   useEffect(() => {
@@ -57,59 +55,55 @@ const Events = () => {
     fetchData();
   }, []);
 
- const handleLike = async (eventId) => {
-  try {
-    const fingerprint = await generateFingerprint();
-    const res = await axios.post(
-      `${process.env.REACT_APP_API_URL}/event-likes/toggle`,
-      { eventId, fingerprint }
-    );
+  const handleLike = async (eventId, e) => {
+    e.stopPropagation();
+    try {
+      const fingerprint = await generateFingerprint();
+      const res = await axios.post(
+        `${process.env.REACT_APP_API_URL}/event-likes/toggle`,
+        { eventId, fingerprint }
+      );
 
-    // Update UI with the count from the Lambda
-    setLikeCounts(prev => ({
-      ...prev,
-      [eventId]: res.data.likeCount
-    }));
-    setUserLikes(prev => ({
-      ...prev,
-      [eventId]: res.data.action === 'like'
-    }));
+      setRsvpCounts(prev => ({
+        ...prev,
+        [eventId]: res.data.likeCount
+      }));
+      setUserReactions(prev => ({
+        ...prev,
+        [eventId]: res.data.action === 'like'
+      }));
 
-  } catch (err) {
-    setError("Failed to update like");
-  }
-};
+    } catch (err) {
+      setError("Failed to update like");
+    }
+  };
 
-// Helper to generate a fingerprint (uses IP + User-Agent)
-const generateFingerprint = async () => {
-  try {
-    // Get IP (requires a free service like ipapi.co)
-    const ipRes = await axios.get('https://ipapi.co/json/');
-    const ip = ipRes.data.ip;
-    const userAgent = navigator.userAgent;
-    return `${ip}-${userAgent}`.hashCode(); // Simple hash
-  } catch {
-    // Fallback to less reliable session ID
-    return `session-${Math.random().toString(36).substr(2, 9)}`;
-  }
-};
+  const generateFingerprint = async () => {
+    try {
+      const ipRes = await axios.get('https://ipapi.co/json/');
+      const ip = ipRes.data.ip;
+      const userAgent = navigator.userAgent;
+      return `${ip}-${userAgent}`.hashCode();
+    } catch {
+      return `session-${Math.random().toString(36).substr(2, 9)}`;
+    }
+  };
 
-// Simple string hashing (add this to your utils)
-String.prototype.hashCode = function() {
-  let hash = 0;
-  for (let i = 0; i < this.length; i++) {
-    hash = Math.imul(31, hash) + this.charCodeAt(i) | 0;
-  }
-  return hash.toString(16);
-};
+  String.prototype.hashCode = function() {
+    let hash = 0;
+    for (let i = 0; i < this.length; i++) {
+      hash = Math.imul(31, hash) + this.charCodeAt(i) | 0;
+    }
+    return hash.toString(16);
+  };
 
-  // Helper to check if url is video
   const isVideo = (url) => {
     if (!url) return false;
     return /\.(mp4|webm|ogg)$/i.test(url);
   };
 
-  const openMediaModal = (url) => {
+  const openMediaModal = (url, e) => {
+    e?.stopPropagation();
     setMediaModalUrl(url);
     setMediaModalIsVideo(isVideo(url));
   };
@@ -125,17 +119,9 @@ String.prototype.hashCode = function() {
     const media = event.media;
     const eventId = event.id;
     const visibleCount = 4;
-
-    // Current scroll index or 0 if none
     const currentIndex = thumbnailScroll[eventId] || 0;
-
-    // Show left arrow only if currentIndex > 0
     const showLeftArrow = currentIndex > 0;
-
-    // Show right arrow only if we can scroll further right
     const showRightArrow = currentIndex + visibleCount < media.length;
-
-    // Slice media for visible thumbnails
     const visibleMedia = media.slice(currentIndex, currentIndex + visibleCount);
 
     const arrowStyle = {
@@ -150,16 +136,16 @@ String.prototype.hashCode = function() {
       backgroundColor: '#2a3a5f',
     };
 
-    // Left arrow click only changes this event's scroll index
-    const handleLeftClick = () => {
+    const handleLeftClick = (e) => {
+      e.stopPropagation();
       setThumbnailScroll((prev) => ({
         ...prev,
         [eventId]: Math.max(0, currentIndex - 1),
       }));
     };
 
-    // Right arrow click only changes this event's scroll index
-    const handleRightClick = () => {
+    const handleRightClick = (e) => {
+      e.stopPropagation();
       setThumbnailScroll((prev) => ({
         ...prev,
         [eventId]: Math.min(media.length - visibleCount, currentIndex + 1),
@@ -184,7 +170,7 @@ String.prototype.hashCode = function() {
             role="button"
             tabIndex={0}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') handleLeftClick();
+              if (e.key === 'Enter' || e.key === ' ') handleLeftClick(e);
             }}
           >
             ◀
@@ -205,7 +191,7 @@ String.prototype.hashCode = function() {
                 cursor: 'pointer',
                 border: '2px solid transparent',
               }}
-              onClick={() => openMediaModal(mediaItem.url)}
+              onClick={(e) => openMediaModal(mediaItem.url, e)}
             />
           ))}
         </div>
@@ -218,7 +204,7 @@ String.prototype.hashCode = function() {
             role="button"
             tabIndex={0}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') handleRightClick();
+              if (e.key === 'Enter' || e.key === ' ') handleRightClick(e);
             }}
           >
             ▶
@@ -244,7 +230,7 @@ String.prototype.hashCode = function() {
               border: `1px solid ${colors.cardBorder}`,
               cursor: 'pointer',
             }}
-            onClick={() => openMediaModal(event.posterUrl)}
+            onClick={(e) => openMediaModal(event.posterUrl, e)}
           />
         );
       }
@@ -266,7 +252,7 @@ String.prototype.hashCode = function() {
               border: `1px solid ${colors.cardBorder}`,
               cursor: 'pointer',
             }}
-            onClick={() => openMediaModal(event.posterUrl)}
+            onClick={(e) => openMediaModal(event.posterUrl, e)}
           />
           {renderThumbnails(event)}
         </>
@@ -290,7 +276,7 @@ String.prototype.hashCode = function() {
                 marginBottom: '12px',
                 cursor: 'pointer',
               }}
-              onClick={() => openMediaModal(firstMedia.url)}
+              onClick={(e) => openMediaModal(firstMedia.url, e)}
             />
           ) : (
             <img
@@ -304,7 +290,7 @@ String.prototype.hashCode = function() {
                 marginBottom: '12px',
                 cursor: 'pointer',
               }}
-              onClick={() => openMediaModal(firstMedia.url)}
+              onClick={(e) => openMediaModal(firstMedia.url, e)}
             />
           ))}
         {otherMedia.length > 0 && renderThumbnails({ ...event, media: otherMedia })}
@@ -331,7 +317,14 @@ String.prototype.hashCode = function() {
           background: colors.cardBg,
           boxShadow: '0 8px 24px rgba(0,10,30,0.4)',
           marginBottom: '1.5rem',
+          cursor: 'pointer',
+          transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+          ':hover': {
+            transform: 'translateY(-5px)',
+            boxShadow: '0 12px 28px rgba(0,10,30,0.5)',
+          }
         }}
+        onClick={() => navigate(`/thisEvent/${event.id}`)}
       >
         <h3 style={{ color: colors.textPrimary }}>
           {event.title}
@@ -358,9 +351,12 @@ String.prototype.hashCode = function() {
         </p>
 
         {event.requiresRsvp && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div 
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
-              onClick={() => handleLike(event.id)}
+              onClick={(e) => handleLike(event.id, e)}
               style={{
                 padding: '0.5rem',
                 borderRadius: '8px',
@@ -434,7 +430,6 @@ String.prototype.hashCode = function() {
         </div>
       )}
 
-      {/* Media preview modal */}
       <Modal show={!!mediaModalUrl} onHide={closeMediaModal} centered size="lg">
         <Modal.Body style={{ padding: 0 }}>
           {mediaModalIsVideo ? (

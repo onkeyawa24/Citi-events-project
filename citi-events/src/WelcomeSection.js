@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 const colors = {
   primaryBg: '#161F36',
@@ -16,6 +17,7 @@ const colors = {
 };
 
 const WelcomeSection = () => {
+  const navigate = useNavigate();
   const [latestEvents, setLatestEvents] = useState([]);
   const [motivation, setMotivation] = useState('');
 
@@ -85,10 +87,30 @@ const WelcomeSection = () => {
           padding: '2rem'
         }}>
           <h1 style={{ fontSize: '3rem', marginBottom: '1rem' }}>Welcome to Citi Events</h1>
-          <p style={{ fontSize: '1.2rem' }}>
+          <p style={{ fontSize: '1.2rem', marginBottom: '2rem' }}>
             Discover exciting upcoming events and announcements from our campus community.
             Whether you're here to learn, grow, or connect — there's always something happening.
           </p>
+          <button 
+            onClick={() => navigate('/events')}
+            style={{
+              padding: '0.75rem 1.5rem',
+              fontSize: '1rem',
+              fontWeight: '600',
+              backgroundColor: colors.accent,
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              ':hover': {
+                backgroundColor: colors.accentLight,
+                transform: 'translateY(-2px)'
+              }
+            }}
+          >
+            View Events
+          </button>
         </div>
       </div>
 
@@ -97,7 +119,9 @@ const WelcomeSection = () => {
         flex: '1 1 30%',
         backgroundColor: colors.primaryBg,
         padding: '2rem',
-        color: colors.textPrimary
+        color: colors.textPrimary,
+        display: 'flex',
+        flexDirection: 'column'
       }}>
         {/* Motivation */}
         <div style={{
@@ -135,71 +159,96 @@ const WelcomeSection = () => {
         </div>
 
         {/* Upcoming Events */}
-        <h4 style={{ borderBottom: `2px solid ${colors.cardBorder}`, paddingBottom: '0.5rem' }}>
-          Upcoming Events
-        </h4>
+        <div style={{ flex: 1 }}>
+          <h4 style={{ borderBottom: `2px solid ${colors.cardBorder}`, paddingBottom: '0.5rem' }}>
+            Recent Events
+          </h4>
 
-        <ul style={{ listStyle: 'none', paddingLeft: 0, marginTop: '1rem' }}>
-          {latestEvents.map((event, index) => (
-            <li key={event.id || index} style={{
-              display: 'flex',
-              backgroundColor: colors.cardBg,
-              border: `1px solid ${colors.cardBorder}`,
-              borderRadius: '8px',
-              overflow: 'hidden',
-              marginBottom: '1.5rem',
-              flexWrap: 'wrap'
-            }}>
-              {/* Image */}
-              {event.posterUrl && (
-                <div style={{
-                  flex: '0 0 30%',
-                  minWidth: '100px',
-                  maxWidth: '150px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '0.5rem'
-                }}>
-                  <img
-                    src={event.posterUrl}
-                    alt={event.title}
-                    style={{
-                      width: '100%',
-                      height: 'auto',
-                      maxHeight: '80px',
-                      objectFit: 'cover',
-                      borderRadius: '6px'
-                    }}
-                  />
-                </div>
-              )}
-
-              {/* Text */}
-              <div style={{
-                flex: '1 1 70%',
-                padding: '0.75rem 1rem',
+          <ul style={{ listStyle: 'none', paddingLeft: 0, marginTop: '1rem' }}>
+            {latestEvents.map((event, index) => (
+              <li key={event.id || index} style={{
                 display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center'
+                backgroundColor: colors.cardBg,
+                border: `1px solid ${colors.cardBorder}`,
+                borderRadius: '8px',
+                overflow: 'hidden',
+                marginBottom: '1.5rem',
+                flexWrap: 'wrap'
               }}>
-                <h5 style={{ margin: 0, color: colors.textPrimary }}>{event.title}</h5>
-                <p style={{
-                  margin: '0.25rem 0 0.5rem',
-                  color: colors.textSecondary,
-                  fontSize: '0.9rem',
-                  overflow: 'hidden',
-                  display: '-webkit-box',
-                  WebkitLineClamp: 3,
-                  WebkitBoxOrient: 'vertical'
-                }}>{event.description}</p>
-                <small style={{ color: colors.accentLight }}>
-                  {new Date(event.date).toLocaleDateString()}
-                </small>
-              </div>
-            </li>
-          ))}
-        </ul>
+                {/* Image */}
+                {event.posterUrl && (
+                  <div style={{
+                    flex: '0 0 30%',
+                    minWidth: '100px',
+                    maxWidth: '150px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '0.5rem'
+                  }}>
+                    <img
+                      src={event.posterUrl}
+                      alt={event.title}
+                      style={{
+                        width: '100%',
+                        height: 'auto',
+                        maxHeight: '80px',
+                        objectFit: 'cover',
+                        borderRadius: '6px'
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Text */}
+                <div style={{
+                  flex: '1 1 70%',
+                  padding: '0.75rem 1rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center'
+                }}>
+                  <h5 style={{ margin: 0, color: colors.textPrimary }}>{event.title}</h5>
+                  <p style={{
+                    margin: '0.25rem 0 0.5rem',
+                    color: colors.textSecondary,
+                    fontSize: '0.9rem',
+                    overflow: 'hidden',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 3,
+                    WebkitBoxOrient: 'vertical'
+                  }}>{event.description}</p>
+                  <small style={{ color: colors.accentLight }}>
+                    {new Date(event.date).toLocaleDateString()}
+                  </small>
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          {/* View Events Button */}
+          <button 
+            onClick={() => navigate('/events')}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              fontSize: '1rem',
+              fontWeight: '600',
+              backgroundColor: colors.accent,
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              marginTop: '1rem',
+              ':hover': {
+                backgroundColor: colors.accentLight
+              }
+            }}
+          >
+            View All Events
+          </button>
+        </div>
       </div>
     </div>
   );

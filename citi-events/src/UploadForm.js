@@ -1,16 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { Alert, Spinner } from 'react-bootstrap';
+import { fetchAuthSession } from 'aws-amplify/auth';
 
-export default function UploadForm() {
+export default function UploadForm({ onSuccess }) {
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [date, setDate] = useState('');
-  const [type, setType] = useState('event');
-  const [rsvpRequired, setRsvpRequired] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    date: '',
+    type: 'event',
+    requiresRsvp: false
+  });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (!file) {
@@ -19,7 +23,6 @@ export default function UploadForm() {
     }
     const objectUrl = URL.createObjectURL(file);
     setPreviewUrl(objectUrl);
-
     return () => URL.revokeObjectURL(objectUrl);
   }, [file]);
 
@@ -29,216 +32,239 @@ export default function UploadForm() {
     }
   };
 
-  const handleSubmit = e => {
-    e.preventDefault();
+  const handleInputChange = e => {
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+  };
 
-    // Basic validation
-    if (!title || !description) {
-      alert('Please fill in Title and Description.');
+  const handleSubmit = async e => {
+    e.preventDefault();
+    setError(null);
+
+    // Validation
+    if (!formData.title || !formData.description) {
+      setError('Please fill in Title and Description');
       return;
     }
-    if (type === 'event' && (!file || !date)) {
-      alert('Please fill in all required event fields (Date, Poster).');
+    if (formData.type === 'event' && (!file || !formData.date)) {
+      setError('Events require both a date and poster image');
       return;
     }
 
     setLoading(true);
 
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64 = file ? reader.result.split(',')[1] : null;
+    try {
+      const { tokens } = await fetchAuthSession();
+      const idToken = tokens.idToken.toString();
 
-      try {
-        await axios.post(`${process.env.REACT_APP_API_URL}/upload-poster`, {
-          filename: file ? file.name : '',
-          filedata: base64,
-          title,
-          description,
-          date,
-          type,
-          requiresRsvp: rsvpRequired,
+      // Prepare payload
+      const payload = {
+        ...formData,
+        files: []
+      };
+
+      // Add file if exists
+      if (file) {
+        const fileBase64 = await toBase64(file);
+        payload.files.push({
+          filename: file.name,
+          filedata: fileBase64.split(',')[1], // Remove data URL prefix
+          contentType: file.type
         });
+      }
 
+      const response = await axios.post(
+        `${process.env.REACT_APP_API_URL}/upload-events`,
+        payload,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`
+          }
+        }
+      );
+
+      if (response.status === 200) {
         alert('✅ Upload successful!');
         // Reset form
         setFile(null);
-        setTitle('');
-        setDescription('');
-        setDate('');
-        setType('event');
-        setRsvpRequired(false);
-      } catch (err) {
-        console.error('Upload failed:', err);
-        alert('Upload failed: ' + err.message);
-      } finally {
-        setLoading(false);
+        setFormData({
+          title: '',
+          description: '',
+          date: '',
+          type: 'event',
+          requiresRsvp: false
+        });
+        if (onSuccess) onSuccess();
       }
-    };
-
-    if (file) {
-      reader.readAsDataURL(file);
-    } else {
-      // For announcements without file
-      reader.onloadend();
+    } catch (err) {
+      console.error('Upload error:', err);
+      let errorMsg = 'Upload failed';
+      
+      if (err.response) {
+        errorMsg += `: ${err.response.data?.error || err.response.statusText}`;
+      } else if (err.request) {
+        errorMsg += ': No response from server';
+      } else {
+        errorMsg += `: ${err.message}`;
+      }
+      
+      setError(errorMsg);
+    } finally {
+      setLoading(false);
     }
   };
 
+  // Helper function to convert file to base64
+  const toBase64 = file => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = error => reject(error);
+  });
+
   return (
-    <div className={isDarkMode ? 'dark-theme' : 'light-theme'} style={styles.container}>
+    <div style={{ 
+      maxWidth: '600px', 
+      margin: '0 auto',
+      padding: '20px',
+      backgroundColor: '#1E2A4A',
+      borderRadius: '8px',
+      border: '1px solid #2A3A5F'
+    }}>
+      <h2 style={{ color: '#E0E7FF', marginBottom: '20px' }}>
+        Create New {formData.type.charAt(0).toUpperCase() + formData.type.slice(1)}
+      </h2>
 
-      <form onSubmit={handleSubmit} style={styles.form}>
-        <h2>Upload Poster</h2>
+      {error && (
+        <Alert variant="danger" style={{ marginBottom: '20px' }}>
+          {error}
+        </Alert>
+      )}
 
-        <label style={styles.label}>
-          Type
+      <form onSubmit={handleSubmit}>
+        <div className="mb-3">
+          <label htmlFor="type" className="form-label" style={{ color: '#E0E7FF' }}>Type</label>
           <select
-            value={type}
-            onChange={e => setType(e.target.value)}
-            style={styles.input}
+            id="type"
+            name="type"
+            className="form-control"
+            value={formData.type}
+            onChange={handleInputChange}
+            style={{ backgroundColor: '#2A3A5F', color: '#E0E7FF', border: '1px solid #3A4B6F' }}
           >
             <option value="event">Event</option>
             <option value="announcement">Announcement</option>
           </select>
-        </label>
+        </div>
 
-        <label style={styles.label}>
-          Title
+        <div className="mb-3">
+          <label htmlFor="title" className="form-label" style={{ color: '#E0E7FF' }}>Title*</label>
           <input
             type="text"
-            value={title}
-            onChange={e => setTitle(e.target.value)}
+            id="title"
+            name="title"
+            className="form-control"
+            value={formData.title}
+            onChange={handleInputChange}
             required
-            style={styles.input}
+            style={{ backgroundColor: '#2A3A5F', color: '#E0E7FF', border: '1px solid #3A4B6F' }}
           />
-        </label>
+        </div>
 
-        <label style={styles.label}>
-          Description
+        <div className="mb-3">
+          <label htmlFor="description" className="form-label" style={{ color: '#E0E7FF' }}>Description*</label>
           <textarea
-            value={description}
-            onChange={e => setDescription(e.target.value)}
+            id="description"
+            name="description"
+            className="form-control"
+            value={formData.description}
+            onChange={handleInputChange}
             required
-            style={styles.textarea}
+            rows="3"
+            style={{ backgroundColor: '#2A3A5F', color: '#E0E7FF', border: '1px solid #3A4B6F' }}
           />
-        </label>
+        </div>
 
-        {type === 'event' && (
+        {formData.type === 'event' && (
           <>
-            <label style={styles.label}>
-              Date
+            <div className="mb-3">
+              <label htmlFor="date" className="form-label" style={{ color: '#E0E7FF' }}>Event Date*</label>
               <input
-                type="date"
-                value={date}
-                onChange={e => setDate(e.target.value)}
+                type="datetime-local"
+                id="date"
+                name="date"
+                className="form-control"
+                value={formData.date}
+                onChange={handleInputChange}
                 required
-                style={styles.input}
+                style={{ backgroundColor: '#2A3A5F', color: '#E0E7FF', border: '1px solid #3A4B6F' }}
               />
-            </label>
+            </div>
 
-            <label style={{ ...styles.label, flexDirection: 'row', alignItems: 'center' }}>
-              <input
-                type="checkbox"
-                checked={rsvpRequired}
-                onChange={e => setRsvpRequired(e.target.checked)}
-                style={{ marginRight: 8 }}
-              />
-              RSVP Required
-            </label>
-
-            <label style={styles.label}>
-              Poster Image
+            <div className="mb-3">
+              <label htmlFor="file" className="form-label" style={{ color: '#E0E7FF' }}>Poster Image*</label>
               <input
                 type="file"
-                accept="image/*"
+                id="file"
+                className="form-control"
                 onChange={handleFileChange}
+                accept="image/*"
                 required
-                style={styles.input}
+                style={{ backgroundColor: '#2A3A5F', color: '#E0E7FF', border: '1px solid #3A4B6F' }}
               />
-            </label>
-
-            {previewUrl && (
-              <div style={styles.previewContainer}>
-                <p>Preview:</p>
-                <img src={previewUrl} alt="Poster preview" style={styles.previewImage} />
-              </div>
-            )}
+              {previewUrl && (
+                <div className="mt-2">
+                  <img 
+                    src={previewUrl} 
+                    alt="Preview" 
+                    style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '4px' }} 
+                  />
+                </div>
+              )}
+            </div>
           </>
         )}
 
-        <button type="submit" style={{ ...styles.submitBtn, opacity: loading ? 0.6 : 1 }} disabled={loading}>
-          {loading ? 'Uploading...' : 'Upload'}
+        <div className="mb-3 form-check">
+          <input
+            type="checkbox"
+            id="requiresRsvp"
+            name="requiresRsvp"
+            className="form-check-input"
+            checked={formData.requiresRsvp}
+            onChange={handleInputChange}
+            style={{ backgroundColor: '#2A3A5F', borderColor: '#3A4B6F' }}
+          />
+          <label htmlFor="requiresRsvp" className="form-check-label" style={{ color: '#E0E7FF' }}>
+            Requires RSVP
+          </label>
+        </div>
+
+        <button 
+          type="submit" 
+          className="btn btn-primary" 
+          disabled={loading}
+          style={{ 
+            backgroundColor: '#4F46E5', 
+            borderColor: '#4F46E5',
+            width: '100%',
+            padding: '10px'
+          }}
+        >
+          {loading ? (
+            <>
+              <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" />
+              <span className="ms-2">Processing...</span>
+            </>
+          ) : (
+            'Submit'
+          )}
         </button>
       </form>
     </div>
   );
 }
-
-const styles = {
-  container: {
-    maxWidth: 400,
-    margin: '2rem auto',
-    padding: 20,
-    borderRadius: 8,
-    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-    fontFamily: 'Arial, sans-serif',
-  },
-  toggleBtn: {
-    marginBottom: 20,
-    padding: '6px 12px',
-    cursor: 'pointer',
-    borderRadius: 4,
-    border: 'none',
-    backgroundColor: '#007bff',
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  form: {
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  label: {
-    marginBottom: 12,
-    fontWeight: 'bold',
-    fontSize: 14,
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  input: {
-    marginTop: 4,
-    padding: 8,
-    fontSize: 14,
-    borderRadius: 4,
-    border: '1px solid #ccc',
-    width: '100%',
-  },
-  textarea: {
-    marginTop: 4,
-    padding: 8,
-    fontSize: 14,
-    borderRadius: 4,
-    border: '1px solid #ccc',
-    width: '100%',
-    resize: 'vertical',
-    minHeight: 60,
-  },
-  previewContainer: {
-    marginBottom: 16,
-  },
-  previewImage: {
-    width: '100%',
-    maxHeight: 200,
-    objectFit: 'contain',
-    borderRadius: 4,
-    border: '1px solid #ddd',
-  },
-  submitBtn: {
-    padding: 10,
-    fontWeight: 'bold',
-    fontSize: 16,
-    backgroundColor: '#28a745',
-    color: 'white',
-    border: 'none',
-    borderRadius: 4,
-    cursor: 'pointer',
-  },
-};
