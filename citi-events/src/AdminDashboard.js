@@ -1,64 +1,121 @@
-// AdminDashboard.js
 import React, { useState, useEffect } from 'react';
-import { Tabs, Tab, Container, Form, Button, Spinner } from 'react-bootstrap';
+import { Tabs, Tab, Container, Form, Button, Spinner, Alert, Dropdown } from 'react-bootstrap';
+import { FiMoreHorizontal, FiLogOut } from 'react-icons/fi';
+import { getCurrentUser, fetchAuthSession, signOut } from 'aws-amplify/auth';
 import axios from 'axios';
-import { Dropdown } from 'react-bootstrap';
-import { FiMoreHorizontal } from 'react-icons/fi';
 import AdminAddMedia from './AdminAddMedia';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import UploadForm from './UploadForm';
 
 const colors = {
   background: '#161F36',
   cardBg: '#1E2A4A',
   textPrimary: '#E0E7FF',
   accent: '#4A65B5',
-  border: '#2A3A5F'
+  border: '#2A3A5F',
 };
 
 const AdminDashboard = () => {
   const [events, setEvents] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({ title: '', description: '', date: '' });
   const [mediaFiles, setMediaFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('events');
 
   useEffect(() => {
-    const fetchEvents = async () => {
+    const verifyAdmin = async () => {
       try {
-        const res = await axios.get(`${process.env.REACT_APP_API_URL}/events`);
-        const filtered = res.data.filter(event => event.type === 'event');
-        setEvents(filtered);
+        setIsLoading(true);
+        const { username, signInDetails } = await getCurrentUser();
+        const { tokens } = await fetchAuthSession();
+        
+        const groups = tokens?.accessToken?.payload['cognito:groups'] || [];
+        setIsAdmin(groups.includes('Admins'));
+
+        if (!groups.includes('Admins')) {
+          setError('You do not have admin privileges');
+        } else {
+          await fetchEvents();
+          await fetchAnnouncements();
+        }
       } catch (err) {
-        console.error('Failed to fetch events');
+        setError('Authentication error. Please login again.');
+        console.error(err);
+        await handleSignOut();
+      } finally {
+        setIsLoading(false);
       }
     };
-    fetchEvents();
+
+    verifyAdmin();
   }, []);
 
-  const openUpdateModal = async (event) => {
-    setSelectedEvent(event);
-    setFormData({
-      title: event.title,
-      description: event.description,
-      date: event.date.slice(0, 10)
-    });
+  const fetchAnnouncements = async () => {
     try {
-      setMediaFiles(event.media || []);
+      const res = await axios.get(`${process.env.REACT_APP_API_URL}/announcements`);
+      setAnnouncements(res.data.filter(item => item.type === 'announcement'));
+    } catch (err) {
+      setError('Failed to fetch announcements');
+      console.error(err);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      window.location.href = '/';
+    } catch (err) {
+      console.error('Error signing out:', err);
+    }
+  };
+
+  const fetchEvents = async () => {
+    try {
+      const res = await axios.get(`${process.env.REACT_APP_API_URL}/events`);
+      setEvents(res.data.filter(event => event.type === 'event'));
+    } catch (err) {
+      setError('Failed to fetch events');
+      console.error(err);
+    }
+  };
+
+  const openUpdateModal = async (event) => {
+    try {
+      setSelectedEvent(event);
+      setFormData({
+        title: event.title,
+        description: event.description,
+        date: event.date.slice(0, 10),
+      });
+
+      const res = await axios.get(`${process.env.REACT_APP_API_URL}/events/${event.id}/media`);
+      setMediaFiles(res.data || []);
     } catch (err) {
       console.error('Failed to fetch media for event');
       setMediaFiles([]);
+    } finally {
+      setShowModal(true);
     }
-    setShowModal(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this event?')) return;
+  const handleDelete = async (id, type) => {
+    if (!window.confirm(`Are you sure you want to delete this ${type}?`)) return;
     try {
-      await axios.delete(`${process.env.REACT_APP_API_URL}/events/${id}`);
-      setEvents(events.filter(e => e.id !== id));
+      await axios.delete(`${process.env.REACT_APP_API_URL}/${type}s/${id}`);
+      if (type === 'event') {
+        setEvents(events.filter(e => e.id !== id));
+      } else {
+        setAnnouncements(announcements.filter(a => a.id !== id));
+      }
     } catch (err) {
-      console.error('Failed to delete event');
+      setError(`Failed to delete ${type}`);
+      console.error(err);
     }
   };
 
@@ -69,13 +126,16 @@ const AdminDashboard = () => {
   const handleEventUpdate = async () => {
     try {
       setUploading(true);
-      await axios.put(`${process.env.REACT_APP_API_URL}/events/${selectedEvent.id}`, formData);
-      const updated = await axios.get(`${process.env.REACT_APP_API_URL}/events`);
-      setEvents(updated.data.filter(e => e.type === 'event'));
+      await axios.put(
+        `${process.env.REACT_APP_API_URL}/events/${selectedEvent.id}`,
+        formData
+      );
+      await fetchEvents();
       setShowModal(false);
       setSelectedEvent(null);
     } catch (err) {
-      console.error('Failed to update event');
+      setError('Failed to update event');
+      console.error(err);
     } finally {
       setUploading(false);
     }
@@ -86,7 +146,8 @@ const AdminDashboard = () => {
       await axios.delete(`${process.env.REACT_APP_API_URL}/media/${mediaId}`);
       setMediaFiles(prev => prev.filter(m => m.mediaId !== mediaId));
     } catch (err) {
-      console.error('Failed to delete media');
+      setError('Failed to delete media');
+      console.error(err);
     }
   };
 
@@ -98,41 +159,132 @@ const AdminDashboard = () => {
     setMediaFiles(reordered);
   };
 
+  if (isLoading) {
+    return (
+      <div style={{ backgroundColor: colors.background, minHeight: '100vh', padding: '80px 20px', color: colors.textPrimary }}>
+        <Container style={{ maxWidth: '800px' }}>
+          <Spinner animation="border" variant="light" />
+          <p className="mt-3">Loading admin dashboard...</p>
+        </Container>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ backgroundColor: colors.background, minHeight: '100vh', padding: '80px 20px', color: colors.textPrimary }}>
+        <Container style={{ maxWidth: '800px' }}>
+          <Alert variant="danger">
+            {error}
+            <div className="mt-3">
+              <Button variant="primary" onClick={handleSignOut}>
+                Return to Login
+              </Button>
+            </div>
+          </Alert>
+        </Container>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div style={{ backgroundColor: colors.background, minHeight: '100vh', padding: '80px 20px', color: colors.textPrimary }}>
+        <Container style={{ maxWidth: '800px' }}>
+          <Spinner animation="border" variant="light" />
+          <p className="mt-3">Verifying admin privileges...</p>
+        </Container>
+      </div>
+    );
+  }
+
+  const renderEventCard = (item) => (
+    <div key={item.id} style={{ background: colors.cardBg, border: `1px solid ${colors.border}`, borderRadius: '12px', padding: '16px', position: 'relative' }}>
+      <div style={{ position: 'absolute', top: '10px', right: '10px', fontSize: '1.5rem' }}>
+        <Dropdown>
+          <Dropdown.Toggle variant="link" style={{ color: colors.textPrimary, padding: 0 }}>
+            <FiMoreHorizontal size={24} />
+          </Dropdown.Toggle>
+          <Dropdown.Menu>
+            <Dropdown.Item onClick={() => openUpdateModal(item)}>Update</Dropdown.Item>
+            <Dropdown.Item onClick={() => handleDelete(item.id, 'event')}>Delete</Dropdown.Item>
+          </Dropdown.Menu>
+        </Dropdown>
+      </div>
+      {item.posterUrl && (
+        <img
+          src={item.posterUrl}
+          alt={item.title}
+          style={{ width: '100%', borderRadius: '8px', marginBottom: '12px', objectFit: 'cover', aspectRatio: '16/9' }}
+        />
+      )}
+      <h5>{item.title}</h5>
+      {item.date && <p style={{ fontSize: '0.9rem' }}>{new Date(item.date).toLocaleDateString()}</p>}
+      <p style={{ fontSize: '0.85rem', color: '#aaa' }}>{item.description?.substring(0, 100)}...</p>
+    </div>
+  );
+
   return (
     <div style={{ backgroundColor: colors.background, minHeight: '100vh', padding: '80px 20px', color: colors.textPrimary }}>
       <Container style={{ maxWidth: '1000px' }}>
-        <h2 className="mb-4" style={{ color: colors.textPrimary }}>🛠️ Admin Dashboard</h2>
+        <div className="d-flex justify-content-between align-items-center mb-4">
+          <h2 style={{ color: colors.textPrimary }}>🛠️ Admin Dashboard</h2>
+          <Button variant="danger" onClick={handleSignOut}>
+            <FiLogOut className="me-1" /> Logout
+          </Button>
+        </div>
+
+        {error && <Alert variant="danger" className="mb-4">{error}</Alert>}
+
         <div style={{ backgroundColor: colors.cardBg, borderRadius: '12px', padding: '20px', boxShadow: '0 8px 24px rgba(0,0,0,0.4)', border: `1px solid ${colors.border}` }}>
-          <Tabs defaultActiveKey="events" id="admin-tabs" className="mb-3" fill variant="pills">
+          <Tabs 
+            activeKey={activeTab}
+            onSelect={(k) => setActiveTab(k)}
+            id="admin-tabs"
+            className="mb-3"
+            fill
+            variant="pills"
+          >
             <Tab eventKey="events" title="Events">
               <div className="pt-3">
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
-                  {events.map(event => (
-                    <div key={event.id} style={{ background: colors.cardBg, border: `1px solid ${colors.border}`, borderRadius: '12px', padding: '16px', position: 'relative' }}>
+                  {events.map(renderEventCard)}
+                </div>
+              </div>
+            </Tab>
+            
+            <Tab eventKey="announcements" title="Announcements">
+              <div className="pt-3">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
+                  {announcements.map(announcement => (
+                    <div key={announcement.id} style={{ background: colors.cardBg, border: `1px solid ${colors.border}`, borderRadius: '12px', padding: '16px', position: 'relative' }}>
                       <div style={{ position: 'absolute', top: '10px', right: '10px', fontSize: '1.5rem' }}>
                         <Dropdown>
                           <Dropdown.Toggle variant="link" style={{ color: colors.textPrimary, padding: 0 }}>
                             <FiMoreHorizontal size={24} />
                           </Dropdown.Toggle>
                           <Dropdown.Menu>
-                            <Dropdown.Item onClick={() => openUpdateModal(event)}>Update</Dropdown.Item>
-                            <Dropdown.Item onClick={() => handleDelete(event.id)}>Delete</Dropdown.Item>
+                            <Dropdown.Item onClick={() => handleDelete(announcement.id, 'announcement')}>Delete</Dropdown.Item>
                           </Dropdown.Menu>
                         </Dropdown>
                       </div>
-                      {event.posterUrl && (
-                        <img
-                          src={event.posterUrl}
-                          alt={event.title}
-                          style={{ width: '100%', borderRadius: '8px', marginBottom: '12px', objectFit: 'cover', aspectRatio: '16/9' }}
-                        />
-                      )}
-                      <h5>{event.title}</h5>
-                      <p style={{ fontSize: '0.9rem' }}>{new Date(event.date).toLocaleDateString()}</p>
-                      <p style={{ fontSize: '0.85rem', color: '#aaa' }}>{event.description?.substring(0, 100)}...</p>
+                      <h5>{announcement.title}</h5>
+                      <p style={{ fontSize: '0.85rem', color: '#aaa' }}>{announcement.description}</p>
                     </div>
                   ))}
                 </div>
+              </div>
+            </Tab>
+            
+            <Tab eventKey="create" title="Create New Event">
+              <div className="pt-3">
+                <UploadForm 
+                  onSuccess={() => {
+                    fetchEvents();
+                    fetchAnnouncements();
+                    setActiveTab('events');
+                  }} 
+                />
               </div>
             </Tab>
           </Tabs>
@@ -199,7 +351,6 @@ const AdminDashboard = () => {
                               </div>
                             )}
                           </Draggable>
-
                         ))}
                         {provided.placeholder}
                       </div>
