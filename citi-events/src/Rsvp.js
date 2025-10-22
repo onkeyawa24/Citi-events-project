@@ -190,7 +190,7 @@ const Rsvp = () => {
 
       {events.length === 0 ? (
         <Alert variant="info" style={{ background: '#1A2E3A', borderColor: colors.accent, color: colors.textPrimary }}>
-          No RSVP events available. Check back later!
+          No RSVP events available. Check again later!
         </Alert>
       ) : (
         <div style={{
@@ -240,3 +240,4 @@ const Rsvp = () => {
 };
 
 export default Rsvp;
+
